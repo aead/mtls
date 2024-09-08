@@ -25,7 +25,7 @@ jobs:
     - name: Build and Lint
       run: |
          go build ./...
-         go vet ./...
+         go vet -tests=false ./... # Specifically for examples without a corresponding identifier
   test:
     name: Text ${{ matrix.os }} | ${{ matrix.go-version }}
     runs-on: ${{ matrix.os }}
