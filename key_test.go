@@ -9,6 +9,10 @@ import (
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
+	"os"
 	"testing"
 
 	"aead.dev/mtls"
@@ -60,4 +64,62 @@ func TestGenerateKeyECDSA(t *testing.T) {
 			t.Fatalf("private keys are not equal: %s != %s", key, key2)
 		}
 	}
+}
+
+// TestPrivateKey_Identity checks that a certificate's public key identity of matches the
+// identity of the corresponding private key.
+func TestPrivateKey_Identity(t *testing.T) {
+	for _, test := range privateKeyIdentityTests {
+		key, err := mtls.ParsePrivateKey(test.PrivateKey)
+		if err != nil {
+			t.Fatalf("failed to parse private key %s: %v", test.PrivateKey, test.PrivateKey)
+		}
+
+		b, err := os.ReadFile(test.Filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		block, _ := pem.Decode(b)
+		if block.Type != "CERTIFICATE" {
+			t.Fatalf("failed to decode file %s as PEM certificate", test.Filename)
+		}
+
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			t.Fatalf("failed to parse certificate %s: %v", test.Filename, err)
+		}
+		id, err := mtls.PeerIdentity(&tls.ConnectionState{
+			PeerCertificates: []*x509.Certificate{cert},
+		})
+		if err != nil {
+			t.Fatalf("failed to compute identity from certificate %s: %v", test.Filename, err)
+		}
+
+		if id != key.Identity() {
+			t.Fatalf("identity mismatch for %s: %s != %s", test.Filename, id, key.Identity())
+		}
+	}
+}
+
+var privateKeyIdentityTests = []struct {
+	Filename   string
+	PrivateKey string
+}{
+	{
+		Filename:   "./testdata/certs/ed25519.crt",
+		PrivateKey: "k1:xZnpcYtPdVMNLBBRaUO5HPEoK_jVrcc3MWR8BshkjJw",
+	},
+	{
+		Filename:   "./testdata/certs/p-256.crt",
+		PrivateKey: "k2:q0B1BZ069Sk3-pBun983nLbQUOSR_j0ltnkfG4nPrE0",
+	},
+	{
+		Filename:   "./testdata/certs/p-384.crt",
+		PrivateKey: "k2:CaJIp1tfO7US1bMkRP1LzVzMV8v4IK5oBW1bhuvJFpFOPtbsJf3a3vViu5uGSas6",
+	},
+	{
+		Filename:   "./testdata/certs/p-521.crt",
+		PrivateKey: "k2:AT7JYw3tnjgYhqplUPiJbITqAdgo4IuDf9talnHivzMeoEsVR60Vidpl93zAdweZApsStCEpHVPtwGAD2UoGI0o0",
+	},
 }
