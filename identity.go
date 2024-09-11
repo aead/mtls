@@ -49,6 +49,11 @@ type Identity struct {
 	hash [32]byte
 }
 
+var zeroIdentity = Identity{}
+
+// IsZero returns true if i is the Identity zero value.
+func (i Identity) IsZero() bool { return i == zeroIdentity }
+
 // MarshalBinary returns a binary representation of the identity.
 func (i Identity) MarshalBinary() ([]byte, error) {
 	var buf [35]byte
