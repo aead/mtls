@@ -14,7 +14,14 @@ import (
 )
 
 // ParseIdentity parses s and returns it as Identity.
+//
+// If s is the empty string, it returns the Identity zero
+// value - for which IsZero returns true - and no error.
 func ParseIdentity(s string) (Identity, error) {
+	if s == "" {
+		return Identity{}, nil
+	}
+
 	var i Identity
 	if err := i.UnmarshalText([]byte(s)); err != nil {
 		return Identity{}, err
@@ -77,8 +84,6 @@ func (i *Identity) UnmarshalBinary(b []byte) error {
 }
 
 // MarshalText returns a textual representation of the identity.
-//
-// Its output is equivalent to [Identity.String]
 func (i Identity) MarshalText() ([]byte, error) {
 	var buf [46]byte
 	b := append(buf[:0], "h1:"...)
@@ -110,8 +115,14 @@ func (i *Identity) UnmarshalText(text []byte) error {
 
 // String returns a string representation of the identity.
 //
-// Its output is equivalent to [Identity.MarshalText]
-func (i Identity) String() string { return "h1:" + base64.RawURLEncoding.EncodeToString(i.hash[:]) }
+// In contrast to [Identity.MarshalText], it returns the empty
+// string if i is the zero value.
+func (i Identity) String() string {
+	if i.IsZero() {
+		return ""
+	}
+	return "h1:" + base64.RawURLEncoding.EncodeToString(i.hash[:])
+}
 
 // IdentityError is an error that occurs when a peer does not provide a
 // certificate during the TLS handshake or sends a public key that doesn't

@@ -88,11 +88,12 @@ var parseIdentityTests = []struct {
 	Identity   string
 	ShouldFail bool
 }{
-	{Identity: "h1:01Wao7cTy0ZGRsOmZzjtnrIliF2ozLlwkGa4adRMAYI"}, // 0
-	{Identity: "h1:9edVjiHvgN6h5L1AmEjUgyapyTdCcrO54-INxKHeDdw"}, // 1
-	{Identity: "h1:Ks-Q7OFe1W_ktXYdoBmHxLWKICLyGRj1P4wFQoZ2JKA"}, // 2
+	{Identity: ""}, // 0
+	{Identity: "h1:01Wao7cTy0ZGRsOmZzjtnrIliF2ozLlwkGa4adRMAYI"}, // 1
+	{Identity: "h1:9edVjiHvgN6h5L1AmEjUgyapyTdCcrO54-INxKHeDdw"}, // 2
+	{Identity: "h1:Ks-Q7OFe1W_ktXYdoBmHxLWKICLyGRj1P4wFQoZ2JKA"}, // 3
 
-	{Identity: "k1:rEvhGSEz3JBPamsG4x09DQ6qHOXElhGvXJeqRl4wD-c", ShouldFail: true},  // 3
-	{Identity: "h1:XCYpGV3rHlfQH10EQ85UbomqW08Chx5Z0ZBTFKpfGqQs", ShouldFail: true}, // 4
-	{Identity: "h1:rakZkIp7uZSoIo1zXl52o75m3GWBK20EntBW4zd-oQ", ShouldFail: true},   // 5
+	{Identity: "k1:rEvhGSEz3JBPamsG4x09DQ6qHOXElhGvXJeqRl4wD-c", ShouldFail: true},  // 4
+	{Identity: "h1:XCYpGV3rHlfQH10EQ85UbomqW08Chx5Z0ZBTFKpfGqQs", ShouldFail: true}, // 5
+	{Identity: "h1:rakZkIp7uZSoIo1zXl52o75m3GWBK20EntBW4zd-oQ", ShouldFail: true},   // 6
 }
