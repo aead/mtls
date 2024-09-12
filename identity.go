@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"strconv"
@@ -42,10 +43,15 @@ func PeerIdentity(state *tls.ConnectionState) (Identity, error) {
 	if state == nil || len(state.PeerCertificates) == 0 {
 		return Identity{}, IdentityError{}
 	}
+	return CertificateIdentity(state.PeerCertificates[0]), nil
+}
 
+// CertificateIdentity returns the identity of the certificate's
+// public key.
+func CertificateIdentity(cert *x509.Certificate) Identity {
 	return Identity{
-		hash: sha256.Sum256(state.PeerCertificates[0].RawSubjectPublicKeyInfo),
-	}, nil
+		hash: sha256.Sum256(cert.RawSubjectPublicKeyInfo),
+	}
 }
 
 // An Identity is a cryptographic checksum over some data, usually a public key.

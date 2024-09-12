@@ -9,7 +9,6 @@ import (
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"os"
@@ -89,13 +88,8 @@ func TestPrivateKey_Identity(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to parse certificate %s: %v", test.Filename, err)
 		}
-		id, err := mtls.PeerIdentity(&tls.ConnectionState{
-			PeerCertificates: []*x509.Certificate{cert},
-		})
-		if err != nil {
-			t.Fatalf("failed to compute identity from certificate %s: %v", test.Filename, err)
-		}
 
+		id := mtls.CertificateIdentity(cert)
 		if id != key.Identity() {
 			t.Fatalf("identity mismatch for %s: %s != %s", test.Filename, id, key.Identity())
 		}
