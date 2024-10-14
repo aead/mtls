@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"aead.dev/mtls/internal/boring"
 )
 
 // PrivateKey is private key for TLS and mutual TLS connections.
@@ -53,6 +55,9 @@ func ParsePrivateKey(s string) (PrivateKey, error) {
 		return nil, errors.New("mtls: invalid private key")
 
 	case strings.HasPrefix(s, "k1:"):
+		if boring.FIPS {
+			return nil, errors.New("mtls: ed25519 not supported by FIPS module")
+		}
 		var key EdDSAPrivateKey
 		if err := key.UnmarshalText([]byte(s)); err != nil {
 			return nil, err
@@ -78,6 +83,10 @@ type EdDSAPrivateKey struct {
 // GenerateKeyEdDSA generates a new [EdDSAPrivateKey] using entropy
 // from random. If random is nil, [crypto/rand.Reader] will be used.
 func GenerateKeyEdDSA(random io.Reader) (*EdDSAPrivateKey, error) {
+	if boring.FIPS {
+		return nil, errors.New("mtls: ed25519 not supported by FIPS module")
+	}
+
 	if random == nil {
 		random = rand.Reader
 	}
@@ -98,6 +107,9 @@ func GenerateKeyEdDSA(random io.Reader) (*EdDSAPrivateKey, error) {
 
 // Private returns the EdDSA private key.
 func (pk *EdDSAPrivateKey) Private() crypto.PrivateKey {
+	if boring.FIPS {
+		panic("mtls: ed25519 not supported by FIPS module")
+	}
 	priv := make(ed25519.PrivateKey, ed25519.PrivateKeySize)
 	copy(priv, pk.priv)
 	return priv
@@ -105,11 +117,17 @@ func (pk *EdDSAPrivateKey) Private() crypto.PrivateKey {
 
 // Public returns the EdDSA public key.
 func (pk *EdDSAPrivateKey) Public() crypto.PublicKey {
+	if boring.FIPS {
+		panic("mtls: ed25519 not supported by FIPS module")
+	}
 	return pk.priv.Public()
 }
 
 // Identity returns the identity of the EdDSA public key.
 func (pk *EdDSAPrivateKey) Identity() Identity {
+	if boring.FIPS {
+		panic("mtls: ed25519 not supported by FIPS module")
+	}
 	return pk.identity
 }
 
@@ -117,6 +135,10 @@ func (pk *EdDSAPrivateKey) Identity() Identity {
 //
 // It returns output equivalent to [EdDSAPrivateKey.String]
 func (pk *EdDSAPrivateKey) MarshalText() ([]byte, error) {
+	if boring.FIPS {
+		return nil, errors.New("mtls: ed25519 not supported by FIPS module")
+	}
+
 	var text [46]byte
 	b := append(text[:0], "k1:"...)
 	b = base64.RawURLEncoding.AppendEncode(b, pk.priv[:ed25519.SeedSize])
@@ -125,6 +147,10 @@ func (pk *EdDSAPrivateKey) MarshalText() ([]byte, error) {
 
 // UnmarshalText parses a private key textual representation.
 func (pk *EdDSAPrivateKey) UnmarshalText(text []byte) error {
+	if boring.FIPS {
+		return errors.New("mtls: ed25519 not supported by FIPS module")
+	}
+
 	if !bytes.HasPrefix(text, []byte("k1:")) {
 		return errors.New("mtls: invalid EdDSA private key")
 	}
@@ -155,6 +181,10 @@ func (pk *EdDSAPrivateKey) UnmarshalText(text []byte) error {
 //
 // Its output is equivalent to [EdDSAPrivateKey.MarshalText]
 func (pk *EdDSAPrivateKey) String() string {
+	if boring.FIPS {
+		panic("mtls: ed25519 not supported by FIPS module")
+	}
+
 	return "k1:" + base64.RawURLEncoding.EncodeToString(pk.priv[:ed25519.SeedSize])
 }
 

@@ -15,11 +15,15 @@ import (
 	"testing"
 
 	"aead.dev/mtls"
+	"aead.dev/mtls/internal/boring"
 )
 
 // TestGenerateKeyEdDSA tests whether generated EdDSA private keys
 // are equal to their parsed textual representation
 func TestGenerateKeyEdDSA(t *testing.T) {
+	if boring.FIPS {
+		t.Skip("Ed25519 is not available in FIPS mode")
+	}
 	t.Parallel()
 
 	key, err := mtls.GenerateKeyEdDSA(rand.Reader)
@@ -69,9 +73,13 @@ func TestGenerateKeyECDSA(t *testing.T) {
 // identity of the corresponding private key.
 func TestPrivateKey_Identity(t *testing.T) {
 	for _, test := range privateKeyIdentityTests {
+		if boring.FIPS && test.SkipFIPS {
+			continue
+		}
+
 		key, err := mtls.ParsePrivateKey(test.PrivateKey)
 		if err != nil {
-			t.Fatalf("failed to parse private key %s: %v", test.PrivateKey, test.PrivateKey)
+			t.Fatalf("failed to parse private key %s: %v", test.PrivateKey, err)
 		}
 
 		b, err := os.ReadFile(test.Filename)
@@ -99,10 +107,12 @@ func TestPrivateKey_Identity(t *testing.T) {
 var privateKeyIdentityTests = []struct {
 	Filename   string
 	PrivateKey string
+	SkipFIPS   bool // Skip test in FIPS mode
 }{
 	{
 		Filename:   "./testdata/certs/ed25519.crt",
 		PrivateKey: "k1:xZnpcYtPdVMNLBBRaUO5HPEoK_jVrcc3MWR8BshkjJw",
+		SkipFIPS:   boring.FIPS,
 	},
 	{
 		Filename:   "./testdata/certs/p-256.crt",

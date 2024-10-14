@@ -85,7 +85,7 @@ func ExampleClient() {
 // certificate issued by a CA trusted by the client.
 func ExampleClient_PrivateKey() {
 	// The server's identity - required to verify mTLS handshakes at the client.
-	const Identity = "h1:dKNb3WhlZ1dxE6VSI1mH7FAd2EPTijEU37RHvkhuT7Y"
+	const Identity = "h1:5OEhsTTKZiK-IFE-Fi6W-VWwp_YLbxik0wxQBNc0_6s"
 
 	srvIdentity, err := mtls.ParseIdentity(Identity)
 	if err != nil {
@@ -95,7 +95,7 @@ func ExampleClient_PrivateKey() {
 	// The client's private key - used to authenticate to the server during mTLS handshakes.
 	// The server must know the identity of the client's private key to be able to verify
 	// the client.
-	const PrivateKey = "k1:rEvhGSEz3JBPamsG4x09DQ6qHOXElhGvXJeqRl4wD-c"
+	const PrivateKey = "k2:q-sFRxPrJNevr8cztwnMONKtC5eVC3an42AWijBGOtc"
 
 	clientKey, err := mtls.ParsePrivateKey(PrivateKey)
 	if err != nil {
@@ -159,7 +159,7 @@ func ExampleClient_PrivateKey() {
 //
 // The server does not authenticate clients.
 func ExampleServer() {
-	const PrivateKey = "k1:VUP2ZuJttWBTJpv3T8aeJR4jaemYYBgjqAri1uK78No"
+	const PrivateKey = "k2:IqYLb-5B3YvUR28WcJoGo3zhWa5GnrcJ9knLEWCHsRU"
 
 	priv, err := mtls.ParsePrivateKey(PrivateKey)
 	if err != nil {
@@ -201,7 +201,7 @@ func ExampleServer() {
 //
 // The server verifies clients using the VerifyPeerIdentity callback.
 func ExampleServer_VerifyPeerIdentity() {
-	const PrivateKey = "k1:VUP2ZuJttWBTJpv3T8aeJR4jaemYYBgjqAri1uK78No"
+	const PrivateKey = "k2:nJev7FTHw5Up-Hbev_iQ-ukYZtDbceXowrhUFcF9zd8"
 
 	priv, err := mtls.ParsePrivateKey(PrivateKey)
 	if err != nil {
@@ -209,7 +209,7 @@ func ExampleServer_VerifyPeerIdentity() {
 	}
 
 	// The client's identity - required to verify mTLS handshakes at the server.
-	const Identity = "h1:Ks-Q7OFe1W_ktXYdoBmHxLWKICLyGRj1P4wFQoZ2JKA"
+	const Identity = "h1:6mn2_7XHfySVJYH0JN5R0kYZjr8I7q4j34BogumV3tM"
 
 	clientIdentity, err := mtls.ParseIdentity(Identity)
 	if err != nil {
@@ -253,8 +253,8 @@ func ExampleServer_VerifyPeerIdentity() {
 func ExampleClientServer() {
 	// The client and server private key. Private keys should never be exposed!
 	const (
-		ServerPrivateKey = "k1:T5duXn2-loqNy4LJT9m-1u6bTi3-GvztEgeIkNYeypg" // Only known to the server
-		ClientPrivateKey = "k1:AqwjUvaWEE9O83quGOkiO_2D1x37Za9gE4L5UHdq0Ag" // Only known to the client
+		ServerPrivateKey = "k2:RsxEXi8ebLIWI8BI9MJHGBqKa1keq67Ds8hrgetZV1M" // Only known to the server
+		ClientPrivateKey = "k2:RtSJhCLcHMAcMlIynDayappxUNl0iSQtggHKNCUXrdQ" // Only known to the client
 	)
 
 	serverKey, err := mtls.ParsePrivateKey(ServerPrivateKey)
@@ -326,5 +326,5 @@ func ExampleClientServer() {
 		log.Fatal(err)
 	}
 	fmt.Println(buf.String())
-	// Output: Hello h1:FALvKoL5sB2mfvXrbheZ8tgKjIJZ60gN-VH9TcfK7Q0
+	// Output: Hello h1:OyfAzRVITGK2QUjHrYg0IC7y5hVjt93FZVucAgSuPeE
 }
