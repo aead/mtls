@@ -247,10 +247,10 @@ func ExampleServer_VerifyPeerIdentity() {
 	// Output:
 }
 
-// ExampleClientServer shows how to send a GET request from a client to server
+// Shows how to send a GET request from a client to server
 // over a mTLS connection. The client and server verify the identity of their
 // peers.
-func ExampleClientServer() {
+func Example() {
 	// The client and server private key. Private keys should never be exposed!
 	const (
 		ServerPrivateKey = "k2:RsxEXi8ebLIWI8BI9MJHGBqKa1keq67Ds8hrgetZV1M" // Only known to the server
