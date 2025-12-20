@@ -41,5 +41,3 @@ The documentation contains [examples](https://pkg.go.dev/aead.dev/mtls#example-p
 2. Peers exchange identities (SHA-256 hash of public key) out-of-band.
    For example, as part of their configuration.
 3. During the TLS handshake, one or both sides verify that the other's public key matches the expected identity.
-
-![TLS Handshakes](./.github/tls-handshakes.svg)
