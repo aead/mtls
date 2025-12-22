@@ -9,6 +9,7 @@ import (
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"os"
@@ -65,9 +66,35 @@ func TestGenerateKeyECDSA(t *testing.T) {
 	}
 }
 
+// TestGenerateKeyRSA tests whether generated RSA private keys
+// are equal to their parsed textual representation for common
+// key sizes.
+func TestGenerateKeyRSA(t *testing.T) {
+	t.Parallel()
+
+	bitSizes := []int{2048, 3072, 4096}
+	for _, bits := range bitSizes {
+		key, err := mtls.GenerateKeyRSA(rand.Reader, bits)
+		if err != nil {
+			t.Fatalf("failed to generate %d RSA private key: %v", bits, err)
+		}
+
+		s := key.String()
+		key2, err := mtls.ParsePrivateKey(s)
+		if err != nil {
+			t.Fatalf("failed to unmarshal %d RSA private key %s: %v", bits, s, err)
+		}
+		if k := key.Private().(*rsa.PrivateKey); !k.Equal(key2.Private()) {
+			t.Fatalf("private keys are not equal: %s != %s", key, key2)
+		}
+	}
+}
+
 // TestPrivateKey_Identity checks that a certificate's public key identity of matches the
 // identity of the corresponding private key.
 func TestPrivateKey_Identity(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range privateKeyIdentityTests {
 		key, err := mtls.ParsePrivateKey(test.PrivateKey)
 		if err != nil {
@@ -115,5 +142,9 @@ var privateKeyIdentityTests = []struct {
 	{
 		Filename:   "./testdata/certs/p-521.crt",
 		PrivateKey: "k2:AT7JYw3tnjgYhqplUPiJbITqAdgo4IuDf9talnHivzMeoEsVR60Vidpl93zAdweZApsStCEpHVPtwGAD2UoGI0o0",
+	},
+	{
+		Filename:   "./testdata/certs/rsa.crt",
+		PrivateKey: "k3:AAQAAQABAIDIgYr4PXOsMUpeV-tjoVEs5h6iCudZAkbWA8o3m9C40tIc3ZKPxANNrNDQBv_aQxJsbEvZ8CWgRKuSP3kcFZq1f96Zra99PBvrypAlhtwzehmDUIDJQwlshNIozBRTL_zHFZDKIjMSwiag3bWQmm_ivuNfL-WWIkUpXNU1NvEsWwCAtkeD1ZsCAF1t-_wPl-iHspI-qLz43B1Op2Z7ja-aIYvViYig7a7e_yyr_RR3PePpOiQMcz4HMtWkf3BbyGwSZWm4wlIcNBrLP0oEpDx1sIh1D7yg9aquDiyYuQwFjZwTMP0Vy4KSoz3U1USM-EEICTyM8qBsBp8mGUkOl26ZS2kBAERYqSbToPba3HeNFITdv9_9PLoUsFYl3wKFLNdDDNredfGpkmgeyGl4BLOJ_BR2tNDWbzspLJ45slAe9e-FB5VIgk7lwd_eHBuNSODbUpTkNmge6ZEunQa3j5Yuvh9LxBg-Gwbnm3kSdt8Q0YqrZTwSZMiogAN6aqI1GwjNRHx_8M9718mSGAmlYWHAfXsgxVr3VTMtZjYmGB2_Slu46M4k58Mf2QrOgP9iGz6ED7q2CL3_PIAT1Ce0qKf3UP8IgVm6ENJx5obKdq2UeyV3OQx5HL99_X74f6KjjVtd1XXjrxoSqBP_HZYce8K1FgWjpFMshsPTAHGrsmk_dseDfSk",
 	},
 }
