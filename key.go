@@ -12,18 +12,21 @@ import (
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -45,27 +48,34 @@ type PrivateKey interface {
 
 // ParsePrivateKey parses s and returns it as PrivateKey.
 //
-// Currently, ParsePrivateKey either returns a *EdDSAPrivateKey,
-// a *ECDSAPrivateKey or an error.
+// Currently, ParsePrivateKey either returns a [*EdDSAPrivateKey],
+// a [*ECDSAPrivateKey], a [*RSAPrivateKey] or an error.
 func ParsePrivateKey(s string) (PrivateKey, error) {
-	switch {
-	default:
-		return nil, errors.New("mtls: invalid private key")
+	if len(s) >= 3 {
+		switch s[:3] {
+		case "k1:":
+			var key EdDSAPrivateKey
+			if err := key.UnmarshalText([]byte(s)); err != nil {
+				return nil, err
+			}
+			return &key, nil
 
-	case strings.HasPrefix(s, "k1:"):
-		var key EdDSAPrivateKey
-		if err := key.UnmarshalText([]byte(s)); err != nil {
-			return nil, err
-		}
-		return &key, nil
+		case "k2:":
+			var key ECDSAPrivateKey
+			if err := key.UnmarshalText([]byte(s)); err != nil {
+				return nil, err
+			}
+			return &key, nil
 
-	case strings.HasPrefix(s, "k2:"):
-		var key ECDSAPrivateKey
-		if err := key.UnmarshalText([]byte(s)); err != nil {
-			return nil, err
+		case "k3:":
+			var key RSAPrivateKey
+			if err := key.UnmarshalText([]byte(s)); err != nil {
+				return nil, err
+			}
+			return &key, nil
 		}
-		return &key, nil
 	}
+	return nil, errors.New("mtls: invalid private key")
 }
 
 // EdDSAPrivateKey is a [PrivateKey] for the EdDSA signature algorithm
@@ -210,7 +220,7 @@ func (pk *ECDSAPrivateKey) Private() crypto.PrivateKey {
 	}
 }
 
-// Private returns the ECDSA public key.
+// Public returns the ECDSA public key.
 func (pk *ECDSAPrivateKey) Public() crypto.PublicKey {
 	var X, Y big.Int
 	return &ecdsa.PublicKey{
@@ -223,9 +233,9 @@ func (pk *ECDSAPrivateKey) Public() crypto.PublicKey {
 // Identity returns the identity of the ECDSA public key.
 func (pk *ECDSAPrivateKey) Identity() Identity { return pk.identity }
 
-// MarshalText returns a textual representation of the private key.
+// MarshalText returns a textual representation of the ECDSA private key.
 //
-// It returns output equivalent to [ECDSAPrivateKey.String]
+// It returns output equivalent to [ECDSAPrivateKey.String].
 func (pk *ECDSAPrivateKey) MarshalText() ([]byte, error) {
 	// We use FillBytes instead of Bytes since the later returns
 	// a variable-size slice. However, we want all private key
@@ -241,7 +251,7 @@ func (pk *ECDSAPrivateKey) MarshalText() ([]byte, error) {
 	return b, nil
 }
 
-// UnmarshalText parses an private key textual representation.
+// UnmarshalText parses a ECDSA private key textual representation.
 func (pk *ECDSAPrivateKey) UnmarshalText(text []byte) error {
 	if !bytes.HasPrefix(text, []byte("k2:")) {
 		return errors.New("mtls: invalid ECDSA private key")
@@ -313,9 +323,166 @@ func (pk *ECDSAPrivateKey) String() string {
 	return "k2:" + base64.RawURLEncoding.EncodeToString(priv)
 }
 
+// GenerateKey generates a random RSA private key of the given bit size.
+//
+// If bits is less than 1024, [GenerateKeyRSA] returns an error. See the
+// "[Minimum key size]" section for further details.
+//
+// Most applications should use [crypto/rand.Reader] as random. Note that the
+// returned key does not depend deterministically on the bytes read from rand,
+// and may change between calls and/or between versions.
+//
+// [Minimum key size]: https://pkg.go.dev/crypto/rsa#hdr-Minimum_key_size
+func GenerateKeyRSA(random io.Reader, bits int) (*RSAPrivateKey, error) {
+	priv, err := rsa.GenerateKey(random, bits)
+	if err != nil {
+		return nil, err
+	}
+	if priv.E > math.MaxUint32 {
+		return nil, errors.New("mtls: public RSA exponent " + strconv.Itoa(priv.E) + " is too large")
+	}
+	priv.Precompute()
+
+	identity, err := rsaIdentity(priv)
+	if err != nil {
+		return nil, err
+	}
+	return &RSAPrivateKey{
+		priv:     priv,
+		identity: identity,
+	}, nil
+}
+
+// RSAPrivateKey represents an RSA [PrivateKey].
+type RSAPrivateKey struct {
+	priv     *rsa.PrivateKey
+	identity Identity
+}
+
+// Private returns the RSA private key.
+func (pk *RSAPrivateKey) Private() crypto.PrivateKey { return pk.priv }
+
+// Public returns the RSA public key.
+func (pk *RSAPrivateKey) Public() crypto.PublicKey { return pk.priv.Public() }
+
+// Identity returns the identity of the RSA public key.
+func (pk *RSAPrivateKey) Identity() Identity { return pk.identity }
+
+// MarshalText returns a textual representation of the private key.
+//
+// It returns output equivalent to [RSAPrivateKey.String].
+func (pk *RSAPrivateKey) MarshalText() ([]byte, error) {
+	return base64.RawURLEncoding.AppendEncode([]byte("k3:"), pk.encode()), nil
+}
+
+// UnmarshalText parses a textual representation of an RSA private key.
+func (pk *RSAPrivateKey) UnmarshalText(text []byte) error {
+	if !bytes.HasPrefix(text, []byte("k3:")) {
+		return errors.New("mtls: invalid RSA private key")
+	}
+	text = text[3:]
+
+	var err error
+	data := make([]byte, 0, base64.RawURLEncoding.DecodedLen(len(text)))
+	if data, err = base64.RawURLEncoding.AppendDecode(data, text); err != nil {
+		return err
+	}
+
+	var E uint32
+	if len(data) < 6 {
+		return errors.New("mtls: invalid RSA private key parameter E")
+	}
+	if n := binary.BigEndian.Uint16(data); n != 4 {
+		return errors.New("mtls: invalid RSA private key parameter E: invalid encoding length " + strconv.Itoa(int(n)))
+	}
+	E = binary.BigEndian.Uint32(data[2:])
+	data = data[6:]
+
+	var P, Q, D *big.Int
+	if data, P, err = decodeRSAParam(data); err != nil {
+		return fmt.Errorf("mtls: invalid RSA private key parameter P: %w", err)
+	}
+	if data, Q, err = decodeRSAParam(data); err != nil {
+		return fmt.Errorf("mtls: invalid RSA private key parameter Q: %w", err)
+	}
+	if data, D, err = decodeRSAParam(data); err != nil {
+		return fmt.Errorf("mtls: invalid RSA private key parameter D: %w", err)
+	}
+	if len(data) != 0 {
+		return errors.New("mtls: invalid RSA private key: private key contains additional data")
+	}
+
+	priv := &rsa.PrivateKey{
+		PublicKey: rsa.PublicKey{
+			N: new(big.Int).Mul(P, Q),
+			E: int(E),
+		},
+		D:      D,
+		Primes: []*big.Int{P, Q},
+	}
+	priv.Precompute()
+	if err = priv.Validate(); err != nil {
+		return fmt.Errorf("mtls: invalid RSA private key: %w", err)
+	}
+
+	identity, err := rsaIdentity(priv)
+	if err != nil {
+		return err
+	}
+
+	pk.priv = priv
+	pk.identity = identity
+	return nil
+}
+
+// String returns a string representation of the private key.
+//
+// Its output is equivalent to [RSAPrivateKey.MarshalText]
+func (pk *RSAPrivateKey) String() string {
+	return "k3:" + base64.RawURLEncoding.EncodeToString(pk.encode())
+}
+
+// encode returns the RSA key's binary representation:
+//
+//	len(E) | E | len(P) | P | len(Q) | Q | len(D) | D
+//
+// All numbers are represented in big endian.
+//
+// Values that can be re-computed are omitted to be space efficient.
+// For example, the modulus N = PQ. The private exponent D can also
+// be re-computed given P and Q as D = E⁻¹ mod φ(N) where φ(N) = (p-1)(q-1).
+//
+// However, FIPS 186-5 requires computing it as E⁻¹ mod λ(N) where λ(N) = lcm(p-1, q-1).
+// Hence, we include D to avoid re-implementing private exponent calculations.
+// The binary representation puts D at the end such that we can support shorter
+// private keys (without D) in the future.
+func (pk *RSAPrivateKey) encode() []byte {
+	var (
+		D, P, Q = pk.priv.D, pk.priv.Primes[0], pk.priv.Primes[1]
+		d, p, q = (D.BitLen() + 7) / 8, (P.BitLen() + 7) / 8, (Q.BitLen() + 7) / 8
+
+		buf = make([]byte, max(d, p, q))
+		out = make([]byte, 0, 12+d+p+q) // length-prefixed encoded len: 2 + 4 + 2 + d + 2 + p + 2 + q
+	)
+
+	out = binary.BigEndian.AppendUint16(out, 4)
+	out = binary.BigEndian.AppendUint32(out, uint32(pk.priv.E))
+
+	out = binary.BigEndian.AppendUint16(out, uint16(p))
+	out = append(out, P.FillBytes(buf[:p])...)
+
+	out = binary.BigEndian.AppendUint16(out, uint16(q))
+	out = append(out, Q.FillBytes(buf[:q])...)
+
+	out = binary.BigEndian.AppendUint16(out, uint16(d))
+	out = append(out, D.FillBytes(buf[:d])...)
+	return out
+}
+
 var (
 	oidPublicKeyEdDSA = asn1.ObjectIdentifier{1, 3, 101, 112}
 	oidPublicKeyECDSA = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
+	oidPublicKeyRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
 
 	oidNamedCurveP256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 3, 1, 7}
 	oidNamedCurveP384 = asn1.ObjectIdentifier{1, 3, 132, 0, 34}
@@ -384,7 +551,53 @@ func ecdsaIdentity(key *ecdsa.PrivateKey) (Identity, error) {
 	}, nil
 }
 
-// NewCertificate returns a new TLS certificate using the
+func rsaIdentity(key *rsa.PrivateKey) (Identity, error) {
+	type PKCS1 struct {
+		N *big.Int
+		E int
+	}
+	pubKey, err := asn1.Marshal(PKCS1{
+		N: key.PublicKey.N,
+		E: key.PublicKey.E,
+	})
+	if err != nil {
+		return Identity{}, fmt.Errorf("mtls: failed to encode RSA public key: %w", err)
+	}
+	b, err := asn1.Marshal(publicKeyInfo{
+		Algorithm: pkix.AlgorithmIdentifier{
+			Algorithm:  oidPublicKeyRSA,
+			Parameters: asn1.NullRawValue,
+		},
+		PublicKey: asn1.BitString{BitLength: len(pubKey) * 8, Bytes: pubKey},
+	})
+	if err != nil {
+		return Identity{}, fmt.Errorf("mtls: failed to encode RSA public key: %w", err)
+	}
+
+	return Identity{
+		hash: sha256.Sum256(b),
+	}, nil
+}
+
+// decodeRSAParam decodes a length-encoded big endian binary
+// representation of an RSA private key parameter. In particular,
+// the private exponent D and the prime factors P and Q.
+func decodeRSAParam(b []byte) ([]byte, *big.Int, error) {
+	if len(b) < 2 {
+		return nil, nil, errors.New("invalid length encoding")
+	}
+
+	n := binary.BigEndian.Uint16(b)
+	if n == 0 {
+		return nil, nil, errors.New("parameter length is zero")
+	}
+	if int(n) > len(b)-2 {
+		return nil, nil, errors.New("parameter length " + strconv.Itoa(int(n)) + " exceeds data")
+	}
+	return b[2+n:], new(big.Int).SetBytes(b[2 : 2+n]), nil
+}
+
+// newCertificate returns a new TLS certificate using the
 // given private key.
 func newCertificate(key PrivateKey) (*tls.Certificate, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
