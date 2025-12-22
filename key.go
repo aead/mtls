@@ -7,7 +7,6 @@ package mtls
 import (
 	"bytes"
 	"crypto"
-	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -195,7 +194,7 @@ func GenerateKeyECDSA(curve elliptic.Curve, random io.Reader) (*ECDSAPrivateKey,
 	}
 
 	return &ECDSAPrivateKey{
-		priv:     *priv,
+		priv:     priv,
 		identity: identity,
 	}, nil
 }
@@ -203,7 +202,7 @@ func GenerateKeyECDSA(curve elliptic.Curve, random io.Reader) (*ECDSAPrivateKey,
 // ECDSAPrivateKey is a [PrivateKey] for the elliptic curve digital
 // signature algorithm as specified in FIPS 186-4 and SEC 1, Version 2.0.
 type ECDSAPrivateKey struct {
-	priv     ecdsa.PrivateKey
+	priv     *ecdsa.PrivateKey
 	identity Identity
 }
 
@@ -233,7 +232,7 @@ func (pk *ECDSAPrivateKey) Public() crypto.PublicKey {
 // Identity returns the identity of the ECDSA public key.
 func (pk *ECDSAPrivateKey) Identity() Identity { return pk.identity }
 
-// MarshalText returns a textual representation of the ECDSA private key.
+// MarshalText returns the key's textual representation.
 //
 // It returns output equivalent to [ECDSAPrivateKey.String].
 func (pk *ECDSAPrivateKey) MarshalText() ([]byte, error) {
@@ -259,47 +258,30 @@ func (pk *ECDSAPrivateKey) UnmarshalText(text []byte) error {
 	text = text[3:]
 
 	var (
-		curveDH ecdh.Curve
-		curveEC elliptic.Curve
-		n       = base64.RawURLEncoding.DecodedLen(len(text))
+		curve elliptic.Curve
+		n     = base64.RawURLEncoding.DecodedLen(len(text))
 	)
 	switch n {
 	default:
 		return errors.New("mtls: invalid ECDSA private key length " + strconv.Itoa(n))
 	case 32:
-		curveDH, curveEC = ecdh.P256(), elliptic.P256()
+		curve = elliptic.P256()
 	case 48:
-		curveDH, curveEC = ecdh.P384(), elliptic.P384()
+		curve = elliptic.P384()
 	case 66:
-		curveDH, curveEC = ecdh.P521(), elliptic.P521()
+		curve = elliptic.P521()
 	}
 
-	dec := make([]byte, n)
-	nn, err := base64.RawURLEncoding.Decode(dec, text)
+	buf := make([]byte, 0, n)
+	buf, err := base64.RawURLEncoding.AppendDecode(buf, text)
 	if err != nil {
-		return err
+		return fmt.Errorf("mtls: invalid ECDSA private key: %w", err)
 	}
-	if n != nn {
-		return errors.New("mtls: invalid EdDSA private key length " + strconv.Itoa(nn))
-	}
-
-	ecdhKey, err := curveDH.NewPrivateKey(dec)
+	priv, err := ecdsa.ParseRawPrivateKey(curve, buf)
 	if err != nil {
-		return err
+		return fmt.Errorf("mtls: invalid ECDSA private key: %w", err)
 	}
-
-	D := new(big.Int).SetBytes(ecdhKey.Bytes())
-	X, Y := curveEC.ScalarBaseMult(ecdhKey.Bytes())
-	priv := ecdsa.PrivateKey{
-		D: D,
-		PublicKey: ecdsa.PublicKey{
-			Curve: curveEC,
-			X:     X,
-			Y:     Y,
-		},
-	}
-
-	identity, err := ecdsaIdentity(&priv)
+	identity, err := ecdsaIdentity(priv)
 	if err != nil {
 		return err
 	}
@@ -308,7 +290,7 @@ func (pk *ECDSAPrivateKey) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// String returns a string representation of the private key.
+// String returns the key's string representation.
 //
 // Its output is equivalent to [ECDSAPrivateKey.MarshalText]
 func (pk *ECDSAPrivateKey) String() string {

@@ -1,3 +1,3 @@
 module aead.dev/mtls
 
-go 1.22
+go 1.25
