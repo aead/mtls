@@ -171,7 +171,7 @@ func main() {
 	// handshakes.
 	srv := http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Printf("Hello from server [ identity=%s ] \n      to   client [ identity %s ]\n",
+			fmt.Printf("Hello from server [ identity=%s ] \n      to   client [ identity=%s ]\n",
 				r.TLS.ServerName,
 				mtls.CertificateIdentity(r.TLS.PeerCertificates[0]),
 			)
@@ -229,10 +229,10 @@ func main() {
 ```
 </details>
 
-[This example](https://go.dev/play/p/3ukumzgZNjC) produces the following output:
+[This example](https://go.dev/play/p/g8uqCWppDkc) produces the following output:
 ```
 Hello from server [ identity=h1:l4AoVm6xKAVGsfo8J_ttCOC6Odgq3GJLHg5NtAdOAr0 ] 
-      to   client [ identity h1:z5PgEqVUH_gwBt7oNKX9p9tchzL0i98U6O9C_aM4Y-k ]
+      to   client [ identity=h1:z5PgEqVUH_gwBt7oNKX9p9tchzL0i98U6O9C_aM4Y-k ]
 ```
 
 Now, the server verifies that the public key presented by the client matches the
