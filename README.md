@@ -239,6 +239,59 @@ Now, the server verifies that the public key presented by the client matches the
 expected client identity and the client verifies that the public key presented
 by the server matches the expected server identity.
 
+## FAQs
+
+<details>
+<summary><a href="#faq-ca-signed-certificates">How can TLS without CA-signed certificates be secure?</a></summary>
+
+**TL;DR: Because peers get to know others public keys out-of-band and don't have to rely on a trusted third party for this.**
+
+A certificate is a cryptographically signed statement claiming that some public key `P` is associated with a named entity.
+For example, public key of `example.com` is `P`. 
+
+When a CA issues a certificate it verifies that whoever requests the certficate:
+ - has the private key that corresponds to the public key in the certificate.
+ - and controlls or is responsible for the name(s) in the certificate.
+
+If you want get a CA-issued certificate for `example.com` with the public key `P` then you have to proof to
+the CA that you have the corresponding private key and that you are currently controlling the `example.com` domain.
+
+Basically, all a CA is doing is creating (temporal) cryptographically signed statements about which public key
+belongs to which entity. However, if we know the public keys of our peers beforehand, we don't need a thrid party
+telling us.
+
+In fact, pinning our peer's public key is strictly more secure than relying on CA-issued certificates because
+we no longer have to trust that the CA only ever issues "correct" certificates. A CA becoming malicious or getting
+compromised is no longer a risk in our threat model.
+</details>
+
+<details>
+<summary><a href="#faq-renew-keys">When do I need to renew/change my keys?</a></summary>
+  
+**TL;DR: You don't have to. You can change them whenever you like and you should change them if they could be compromised.**
+
+Certificates expire and have to be renewed mainly because a certificate is a cryptographically signed
+statement associating a public key with named entities. For example, the public key of `example.com`
+is `P`.
+
+Such statements are (ideally) true at some point in time but may not be forever. For example,
+the ownership of the `example.com` domain may change or the corresponding private key gets lost or
+compromised. A certificates can be revoked explicitly but the fact that it got revoked has to be
+recorded and distributed to everyone until it actually expires. If certificates didn’t expire, this
+information would need to be recorded forever.
+
+Certificate renewal is primarily not about changing the key pair. It's perfectly fine to reuse the same
+key pair when renewing a certificate. However, most implementations generate a new key pair, as key
+generation is cheap.
+
+With public key pinning, there’s no third party issuing signed statements that could expire or become invalid,
+so there’s nothing to renew. While key pairs can be changed, this can be done at any time by updating all peers
+that rely on the key pair or public key hash—such as through a configuration update.
+
+If a private key is potentially compromised, it should be replaced, regardless of whether certificates or public 
+key pinning is being used.
+</details>
+
 ## Getting Started
 
 ```sh
