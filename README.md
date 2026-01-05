@@ -242,7 +242,7 @@ by the server matches the expected server identity.
 ## FAQs
 
 <details>
-<summary><a href="#faq-ca-signed-certificates">How can TLS without CA-signed certificates be secure?</a></summary>
+<summary>How can TLS without CA-signed certificates be secure? <a href="#faq-ca-signed-certificates">🔗</a></summary>
 
 **TL;DR: Because peers get to know others public keys out-of-band and don't have to rely on a trusted third party for this.**
 
@@ -266,7 +266,7 @@ compromised is no longer a risk in our threat model.
 </details>
 
 <details>
-<summary><a href="#faq-renew-keys">When do I need to renew/change my keys?</a></summary>
+<summary>When do I need to renew/change my keys? <a href="#faq-renew-keys">🔗</a></summary>
   
 **TL;DR: You don't have to. You can change them whenever you like and you should change them if they could be compromised.**
 
