@@ -292,6 +292,77 @@ If a private key is potentially compromised, it should be replaced, regardless o
 key pinning is being used.
 </details>
 
+<details>
+<summary>Can I use both, CA-issued certificates and public key pinning, at the same time?</summary>
+  
+**TL;DR: Yes. For example with a separate `tls.Config` at the [client](https://pkg.go.dev/aead.dev/mtls#Client.Config) and [server](https://pkg.go.dev/aead.dev/mtls#Server.Config)**
+
+During the TLS handshake, the TLS client can indicate to which server it's trying to connect to via
+the server name indication ([SNI](https://www.rfc-editor.org/rfc/rfc3546#section-3.1)) extension.
+A TLS server may be responsible for multiple domains. For example, `foo.com` as well as `bar.com`.
+A client trying to connect to this server has to include the domain name in the SNI such that the
+server knows whether it should present the certificate issued for `foo.com` or the one for `bar.com`.
+
+This mechanism can also be used to distingush between handshakes expecting a certificate issued for some
+domain(s) and handshakes expecting a particular public key. 
+
+```go
+http.Server{
+    TLSConfig: &tls.Config{
+        GetConfigForClient: (&mtls.Server{
+            // The server's private key used. Clients need to know the corresponding
+            // public key hash.
+            PrivateKey: privKey,
+
+            // Alternative TLS configuration used when clients don't provide a SNI matching the
+            // server's public key hash.
+            Config: &tls.Config{
+                GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+                    // TODO: Return the certificiate matching the client hello.
+                },
+            },
+        }).GetConfigForClient,
+    },
+}
+```
+
+With such a configuration, the server behaves like a "regular" TLS/HTTPS server serving signed certificates
+issued for domains unless a client specifically asks for the public key corresponding the server's `PrivateKey`.
+
+Similarly, a client can only use key pinning for specific servers:
+
+```go
+client := http.Client{
+    Transport: &http.Transport{
+        DialTLSContext: (&mtls.Client{
+            // We only expect a particular public key (matching srvIdentity) if
+            // we are connecting to the DB server. Otherwise, we use "regular"
+            // X.509 certificate verification. See Config below.
+            GetPeerIdentity: func(addr string) (mtls.Identity, bool) {
+                if addr == DBServer {
+                    return srvIdentity, true
+                }
+                return mtls.Identity{}, false
+            },
+
+            // The TLS config used for other TLS handshakes.
+            Config: &tls.Config{},
+        }).DialTLSContext,
+    },
+}
+```
+
+Under the hood, the client sends the public key hash as SNI whenever it expects a particular public key
+from the server and the server only response with its public key when it receives a SNI containing its
+public key hash. For example:
+```
+SNI=h1:l4AoVm6xKAVGsfo8J_ttCOC6Odgq3GJLHg5NtAdOAr0
+```
+
+This has the nice property that clients cannot detect whether a server would serve a different public key
+unless they know the hash of the public key. For such clients, the server behaves like any other TLS server.
+</details>
+
 ## Getting Started
 
 ```sh
