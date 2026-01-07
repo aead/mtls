@@ -310,7 +310,7 @@ domain(s) and handshakes expecting a particular public key.
 http.Server{
     TLSConfig: &tls.Config{
         GetConfigForClient: (&mtls.Server{
-            // The server's private key used. Clients need to know the corresponding
+            // The server's private key. Clients need to know the corresponding
             // public key hash.
             PrivateKey: privKey,
 
@@ -359,7 +359,7 @@ public key hash. For example:
 SNI=h1:l4AoVm6xKAVGsfo8J_ttCOC6Odgq3GJLHg5NtAdOAr0
 ```
 
-This has the nice property that clients cannot detect whether a server would serve a different public key
+This has the nice property that clients cannot detect whether a server would serve such a public key
 unless they know the hash of the public key. For such clients, the server behaves like any other TLS server.
 </details>
 
